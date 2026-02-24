@@ -4,7 +4,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 export default async function handler(req, res) {
   // ✅ CORS headers
-  res.setHeader("Access-Control-Allow-Origin", "*"); 
+  res.setHeader("Access-Control-Allow-Origin", "https://cocktail-genie-backend-s1z1.lovable.app"); 
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
