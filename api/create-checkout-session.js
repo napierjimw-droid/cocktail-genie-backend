@@ -27,8 +27,8 @@ export default async function handler(req, res) {
           quantity: 1,
         },
       ],
-      success_url: "https://cocktail-genie-backend-s1z1.com/success",
-      cancel_url: "https://cocktail-genie-backend-s1z1.com/cancel",
+      success_url: "https://cocktail-genie-ai-bar.lovable.app/success",
+      cancel_url: "https://cocktail-genie-ai-bar.lovable.app/cancel",
     });
 
     res.status(200).json({ url: session.url });
