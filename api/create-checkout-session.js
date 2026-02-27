@@ -20,6 +20,8 @@ export default async function handler(req, res) {
   try {
     const { email } = req.body;
 
+    console.log("APP_URL:", process.env.APP_URL);
+
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       payment_method_types: ["card"],
@@ -36,7 +38,7 @@ export default async function handler(req, res) {
 
     res.status(200).json({ url: session.url });
   } catch (error) {
-    console.error(error);
+    console.error("Stripe error:", error);
     res.status(500).json({ error: "Stripe error" });
   }
 }
