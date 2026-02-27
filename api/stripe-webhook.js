@@ -38,41 +38,56 @@ export default async function handler(req, res) {
       return res.status(400).send(`Webhook Error: ${err.message}`);
     }
 
-    // 🔥 ACTIVATE PREMIUM WHEN PAYMENT IS CONFIRMED
-    if (event.type === "invoice.paid") {
-      const invoice = event.data.object;
+    try {
+      // 🔥 HANDLE SUBSCRIPTION PAYMENT CONFIRMATION
+      if (event.type === "invoice_payment.paid") {
+        const invoicePayment = event.data.object;
 
-      // Get user_id from Stripe metadata
-      const userId =
-        invoice.lines.data[0]?.metadata?.user_id ||
-        invoice.metadata?.user_id;
+        console.log("Invoice payment received:", invoicePayment.id);
 
-      console.log("Activating premium for user:", userId);
-
-      if (!userId) {
-        console.error("No user_id found in Stripe metadata");
-        return res.status(200).json({ received: true });
-      }
-
-      const { error } = await supabase
-        .from("user_subscriptions")
-        .upsert(
-          {
-            user_id: userId,
-            subscription_tier: "premium",
-            subscription_status: "active",
-            updated_at: new Date(),
-          },
-          { onConflict: "user_id" }
+        // 1️⃣ Retrieve full invoice
+        const invoice = await stripe.invoices.retrieve(
+          invoicePayment.invoice
         );
 
-      if (error) {
-        console.error("Supabase update failed:", error);
-      } else {
-        console.log("User upgraded successfully:", userId);
-      }
-    }
+        // 2️⃣ Retrieve subscription to access metadata
+        const subscription = await stripe.subscriptions.retrieve(
+          invoice.subscription
+        );
 
-    res.status(200).json({ received: true });
+        const userId = subscription?.metadata?.user_id;
+
+        console.log("Activating premium for user:", userId);
+
+        if (!userId) {
+          console.error("No user_id found in subscription metadata");
+          return res.status(200).json({ received: true });
+        }
+
+        // 3️⃣ Upsert into Supabase
+        const { error } = await supabase
+          .from("user_subscriptions")
+          .upsert(
+            {
+              user_id: userId,
+              subscription_tier: "premium",
+              subscription_status: "active",
+              updated_at: new Date(),
+            },
+            { onConflict: "user_id" }
+          );
+
+        if (error) {
+          console.error("Supabase update failed:", error);
+        } else {
+          console.log("User upgraded successfully:", userId);
+        }
+      }
+
+      res.status(200).json({ received: true });
+    } catch (err) {
+      console.error("Webhook processing error:", err);
+      res.status(500).json({ error: "Webhook handler failed" });
+    }
   });
 }
