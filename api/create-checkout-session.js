@@ -24,16 +24,18 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Missing email or userId" });
     }
 
-    console.log("Creating checkout for user:", userId);
+    console.log("Creating subscription checkout for user:", userId);
 
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       payment_method_types: ["card"],
       customer_email: email,
 
-      // 🔥 IMPORTANT: attach Supabase user ID
-      metadata: {
-        user_id: userId,
+      // 🔥 CRITICAL FIX: attach metadata to the subscription
+      subscription_data: {
+        metadata: {
+          user_id: userId,
+        },
       },
 
       line_items: [
@@ -48,6 +50,7 @@ export default async function handler(req, res) {
     });
 
     res.status(200).json({ url: session.url });
+
   } catch (error) {
     console.error("Stripe error:", error);
     res.status(500).json({ error: "Stripe error" });
