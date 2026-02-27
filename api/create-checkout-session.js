@@ -19,7 +19,7 @@ export default async function handler(req, res) {
 
   try {
     const { email, userId } = req.body;
-
+    console.log("Incoming userId:", userId);
     if (!email || !userId) {
       return res.status(400).json({ error: "Missing email or userId" });
     }
