@@ -18,20 +18,31 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { email } = req.body;
+    const { email, userId } = req.body;
 
-    console.log("APP_URL:", process.env.APP_URL);
+    if (!email || !userId) {
+      return res.status(400).json({ error: "Missing email or userId" });
+    }
+
+    console.log("Creating checkout for user:", userId);
 
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       payment_method_types: ["card"],
       customer_email: email,
+
+      // 🔥 IMPORTANT: attach Supabase user ID
+      metadata: {
+        user_id: userId,
+      },
+
       line_items: [
         {
           price: process.env.STRIPE_PRICE_ID,
           quantity: 1,
         },
       ],
+
       success_url: `${process.env.APP_URL}/upgrade-success`,
       cancel_url: `${process.env.APP_URL}/profile`,
     });
