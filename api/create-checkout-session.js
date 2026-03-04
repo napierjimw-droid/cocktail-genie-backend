@@ -32,11 +32,12 @@ export default async function handler(req, res) {
       customer_email: email,
 
       // 🔥 CRITICAL FIX: attach metadata to the subscription
-      subscription_data: {
-        metadata: {
-          user_id: userId,
-        },
-      },
+     subscription_data: {
+  trial_period_days: 7,
+  metadata: {
+    user_id: userId,
+  },
+},
 
       line_items: [
         {
