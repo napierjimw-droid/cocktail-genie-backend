@@ -39,14 +39,11 @@ export default async function handler(req, res) {
     }
 
     try {
-      // Handle Stripe subscription payment
       if (event.type === "invoice_payment.paid") {
         const invoicePayment = event.data.object;
 
-        // Get invoice
         const invoice = await stripe.invoices.retrieve(invoicePayment.invoice);
 
-        // Get subscription
         const subscription = await stripe.subscriptions.retrieve(
           invoice.subscription
         );
@@ -56,7 +53,7 @@ export default async function handler(req, res) {
         console.log("Invoice payment received for user:", userId);
 
         if (!userId) {
-          console.error("Missing user_id metadata");
+          console.error("No user_id metadata found");
           return res.status(200).json({ received: true });
         }
 
