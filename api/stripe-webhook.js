@@ -39,32 +39,19 @@ export default async function handler(req, res) {
     }
 
     try {
-      // 🔥 HANDLE SUBSCRIPTION PAYMENT CONFIRMATION
-      if (event.type === "invoice_payment.paid") {
-        const invoicePayment = event.data.object;
+      // 🔥 Handle successful checkout
+      if (event.type === "checkout.session.completed") {
+        const session = event.data.object;
 
-        console.log("Invoice payment received:", invoicePayment.id);
+        const userId = session.metadata?.user_id;
 
-        // 1️⃣ Retrieve full invoice
-        const invoice = await stripe.invoices.retrieve(
-          invoicePayment.invoice
-        );
-
-        // 2️⃣ Retrieve subscription to access metadata
-        const subscription = await stripe.subscriptions.retrieve(
-          invoice.subscription
-        );
-
-        const userId = subscription?.metadata?.user_id;
-
-        console.log("Activating premium for user:", userId);
+        console.log("Webhook received for user:", userId);
 
         if (!userId) {
-          console.error("No user_id found in subscription metadata");
+          console.error("Missing user_id metadata");
           return res.status(200).json({ received: true });
         }
 
-        // 3️⃣ Upsert into Supabase
         const { error } = await supabase
           .from("user_subscriptions")
           .upsert(
@@ -80,14 +67,14 @@ export default async function handler(req, res) {
         if (error) {
           console.error("Supabase update failed:", error);
         } else {
-          console.log("User upgraded successfully:", userId);
+          console.log("Subscription upgraded to premium:", userId);
         }
       }
 
       res.status(200).json({ received: true });
     } catch (err) {
       console.error("Webhook processing error:", err);
-      res.status(500).json({ error: "Webhook handler failed" });
+      res.status(500).json({ error: "Webhook failed" });
     }
   });
 }
