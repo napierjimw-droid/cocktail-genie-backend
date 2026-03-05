@@ -8,38 +8,49 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
+// VERY IMPORTANT: disable body parsing for Stripe signature verification
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};
+
 export default async function handler(req, res) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
-  }
+  const chunks = [];
 
-  const sig = req.headers["stripe-signature"];
+  req.on("data", (chunk) => {
+    chunks.push(chunk);
+  });
 
-  let event;
+  req.on("end", async () => {
+    const buf = Buffer.concat(chunks);
+    const sig = req.headers["stripe-signature"];
 
-  try {
-    event = stripe.webhooks.constructEvent(
-      req.body,
-      sig,
-      process.env.STRIPE_WEBHOOK_SECRET
-    );
-  } catch (err) {
-    console.error("Webhook signature verification failed:", err.message);
-    return res.status(400).send(`Webhook Error: ${err.message}`);
-  }
+    let event;
 
-  try {
+    try {
+      event = stripe.webhooks.constructEvent(
+        buf,
+        sig,
+        process.env.STRIPE_WEBHOOK_SECRET
+      );
+    } catch (err) {
+      console.error("Webhook signature verification failed:", err.message);
+      return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+
+    // Handle successful payment
     if (event.type === "invoice_payment.paid") {
-      const invoicePayment = event.data.object;
+      const invoice = event.data.object;
 
-      const invoice = await stripe.invoices.retrieve(invoicePayment.invoice);
-      const subscription = await stripe.subscriptions.retrieve(invoice.subscription);
+      const userId =
+        invoice.lines.data[0]?.metadata?.user_id ||
+        invoice.subscription_details?.metadata?.user_id;
 
-      const userId = subscription.metadata?.user_id;
-
-      console.log("User ID from Stripe metadata:", userId);
+      console.log("Invoice payment received for user:", userId);
 
       if (!userId) {
+        console.error("No user_id found in Stripe metadata");
         return res.status(200).json({ received: true });
       }
 
@@ -62,9 +73,6 @@ export default async function handler(req, res) {
       }
     }
 
-    return res.status(200).json({ received: true });
-  } catch (err) {
-    console.error("Webhook handler error:", err);
-    return res.status(500).json({ error: "Webhook failed" });
-  }
+    res.status(200).json({ received: true });
+  });
 }
