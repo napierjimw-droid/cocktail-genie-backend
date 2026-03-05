@@ -1,78 +1,31 @@
-import Stripe from "stripe";
-import { createClient } from "@supabase/supabase-js";
+// ACTIVATE PREMIUM WHEN CHECKOUT COMPLETES
+if (event.type === "checkout.session.completed") {
+  const session = event.data.object;
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+  const userId = session.metadata?.user_id;
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+  console.log("Checkout completed for user:", userId);
 
-// VERY IMPORTANT: disable body parsing for Stripe signature verification
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
+  if (!userId) {
+    console.error("No user_id found in metadata");
+    return res.status(200).json({ received: true });
+  }
 
-export default async function handler(req, res) {
-  const chunks = [];
+  const { error } = await supabase
+    .from("user_subscriptions")
+    .upsert(
+      {
+        user_id: userId,
+        subscription_tier: "premium",
+        subscription_status: "active",
+        updated_at: new Date(),
+      },
+      { onConflict: "user_id" }
+    );
 
-  req.on("data", (chunk) => {
-    chunks.push(chunk);
-  });
-
-  req.on("end", async () => {
-    const buf = Buffer.concat(chunks);
-    const sig = req.headers["stripe-signature"];
-
-    let event;
-
-    try {
-      event = stripe.webhooks.constructEvent(
-        buf,
-        sig,
-        process.env.STRIPE_WEBHOOK_SECRET
-      );
-    } catch (err) {
-      console.error("Webhook signature verification failed:", err.message);
-      return res.status(400).send(`Webhook Error: ${err.message}`);
-    }
-
-    // Handle successful payment
-    if (event.type === "invoice_payment.paid") {
-      const invoice = event.data.object;
-
-      const userId =
-        invoice.lines.data[0]?.metadata?.user_id ||
-        invoice.subscription_details?.metadata?.user_id;
-
-      console.log("Invoice payment received for user:", userId);
-
-      if (!userId) {
-        console.error("No user_id found in Stripe metadata");
-        return res.status(200).json({ received: true });
-      }
-
-      const { error } = await supabase
-        .from("user_subscriptions")
-        .upsert(
-          {
-            user_id: userId,
-            subscription_tier: "premium",
-            subscription_status: "active",
-            updated_at: new Date(),
-          },
-          { onConflict: "user_id" }
-        );
-
-      if (error) {
-        console.error("Supabase update failed:", error);
-      } else {
-        console.log("User upgraded to premium:", userId);
-      }
-    }
-
-    res.status(200).json({ received: true });
-  });
+  if (error) {
+    console.error("Supabase update failed:", error);
+  } else {
+    console.log("User upgraded to premium:", userId);
+  }
 }
