@@ -1,13 +1,15 @@
-// ACTIVATE PREMIUM WHEN CHECKOUT COMPLETES
 if (event.type === "checkout.session.completed") {
   const session = event.data.object;
 
-  const userId = session.metadata?.user_id;
+  // retrieve full subscription from Stripe
+  const subscription = await stripe.subscriptions.retrieve(session.subscription);
 
-  console.log("Checkout completed for user:", userId);
+  const userId = subscription.metadata?.user_id;
+
+  console.log("Stripe subscription metadata user:", userId);
 
   if (!userId) {
-    console.error("No user_id found in metadata");
+    console.error("No user_id in subscription metadata");
     return res.status(200).json({ received: true });
   }
 
@@ -18,13 +20,14 @@ if (event.type === "checkout.session.completed") {
         user_id: userId,
         subscription_tier: "premium",
         subscription_status: "active",
-        updated_at: new Date(),
+        started_at: new Date(),
+        updated_at: new Date()
       },
       { onConflict: "user_id" }
     );
 
   if (error) {
-    console.error("Supabase update failed:", error);
+    console.error("Supabase error:", error);
   } else {
     console.log("User upgraded to premium:", userId);
   }
